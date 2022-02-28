@@ -16,6 +16,7 @@
  */
 
 #include "AuthSession.h"
+#include "Timer.h"
 #include "ByteBuffer.h"
 #include "Errors.h"
 #include <hffix.hpp>
@@ -57,9 +58,19 @@ void ReadMessage(ByteBuffer& packet)
                     << i++->value().as_int<int>() << '\n';
 
                 if (reader.find_with_hint(hffix::tag::SendingTime, i))
+                {
+                    std::chrono::time_point<std::chrono::system_clock, Milliseconds> now;
+                    std::string timeStr = "<error>";
+
+                    if (i++->value().as_timestamp(now))
+                    {
+                        timeStr = Warhead::Time::TimeToHumanReadable(std::chrono::duration_cast<Seconds>(now.time_since_epoch()));
+                    }
+
                     std::cout
-                    << "SendingTime  = "
-                    << i++->value().as_timestamp() << '\n';
+                        << "SendingTime  = "
+                        << timeStr << '\n';
+                }
 
                 std::cout
                     << "The next field is "
@@ -104,10 +115,84 @@ void ReadMessage(ByteBuffer& packet)
         ABORT("Invalid FIX message: '{}'", packet.ReadCString());
 }
 
+void PrepareTestMessage(ByteBuffer& packet)
+{
+    using namespace boost::posix_time;
+    using namespace boost::gregorian;
+
+    int seq_send(1); // Sending sequence number.
+
+    char buffer[1 << 13];
+
+    std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+
+    // We'll put a FIX Logon message in the buffer.
+    hffix::message_writer logon(buffer, buffer + sizeof(buffer));
+
+    logon.push_back_header("FIX.5.0"); // Write BeginString and BodyLength.
+
+    // Logon MsgType.
+    logon.push_back_string(hffix::tag::MsgType, "A");
+    logon.push_back_string(hffix::tag::SenderCompID, "AAAA");
+    logon.push_back_string(hffix::tag::TargetCompID, "BBBB");
+    logon.push_back_int(hffix::tag::MsgSeqNum, seq_send++);
+    logon.push_back_timestamp(hffix::tag::SendingTime, now);
+
+    // No encryption.
+    logon.push_back_int(hffix::tag::EncryptMethod, 0);
+    // 10 second heartbeat interval.
+    logon.push_back_int(hffix::tag::HeartBtInt, 10);
+
+    logon.push_back_trailer(); // write CheckSum.
+
+    // Now the Logon message is written to the buffer.
+
+    // Add a FIX New Order - Single message to the buffer, after the Logon
+    // message.
+    hffix::message_writer new_order(logon.message_end(), buffer + sizeof(buffer));
+
+    new_order.push_back_header("FIX.5.0");
+
+    // New Order - Single
+    new_order.push_back_string(hffix::tag::MsgType, "D");
+    // Required Standard Header field.
+    new_order.push_back_string(hffix::tag::SenderCompID, "AAAA");
+    new_order.push_back_string(hffix::tag::TargetCompID, "BBBB");
+    new_order.push_back_int(hffix::tag::MsgSeqNum, seq_send++);
+    new_order.push_back_timestamp(hffix::tag::SendingTime, now);
+    new_order.push_back_string(hffix::tag::ClOrdID, "A1");
+    // Automated execution.
+    new_order.push_back_char(hffix::tag::HandlInst, '1');
+    // Ticker symbol OIH.
+    new_order.push_back_string(hffix::tag::Symbol, "OIH");
+    // Buy side.
+    new_order.push_back_char(hffix::tag::Side, '1');
+    new_order.push_back_timestamp(hffix::tag::TransactTime, now);
+    // 100 shares.
+    new_order.push_back_int(hffix::tag::OrderQty, 100);
+    // Limit order.
+    new_order.push_back_char(hffix::tag::OrdType, '2');
+    // Limit price $500.01 = 50001*(10^-2). The push_back_decimal() method
+    // takes a decimal floating point number of the form mantissa*(10^exponent).
+    new_order.push_back_decimal(hffix::tag::Price, 50001, -2);
+    // Good Till Cancel.
+    new_order.push_back_char(hffix::tag::TimeInForce, '1');
+
+    new_order.push_back_trailer(); // write CheckSum.
+
+    //Now the New Order message is in the buffer after the Logon message.
+
+    packet << buffer;
+}
+
 void AuthSession::Start()
 {
     std::string ip_address = GetRemoteIpAddress().to_string();
     LOG_TRACE("Accepted connection from {}:{}", GetRemoteIpAddress().to_string(), GetRemotePort());
+
+    ByteBuffer packet;
+    PrepareTestMessage(packet);
+    SendPacket(packet);
 
     AsyncRead();
 }

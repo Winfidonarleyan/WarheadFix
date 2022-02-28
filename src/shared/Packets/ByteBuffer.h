@@ -77,6 +77,12 @@ public:
         _storage.reserve(DEFAULT_SIZE);
     }
 
+    ByteBuffer(const char* buffer, std::size_t reserve)
+    {
+        _storage.reserve(reserve);
+        memcpy(_storage.data(), buffer, reserve);
+    }
+
     ByteBuffer(size_t reserve) : _rpos(0), _wpos(0)
     {
         _storage.reserve(reserve);
