@@ -29,7 +29,6 @@ namespace
 {
     std::string _filename;
     std::vector<std::string> _additonalFiles;
-    std::vector<std::string> _args;
     std::unordered_map<std::string /*name*/, std::string /*value*/> _configOptions;
     std::mutex _configLock;
     bool _usingDistConfig = false;
@@ -37,7 +36,7 @@ namespace
     template<typename... Args>
     inline void PrintError(std::string_view fmt, Args&& ... args)
     {
-        LOG_ERROR(Warhead::StringFormat(fmt, std::forward<Args>(args)...));
+        LOG_ERROR("config", fmt, std::forward<Args>(args)...);
     }
 
     void AddKey(std::string const& optionName, std::string const& optionKey, std::string_view fileName, bool isOptional, [[maybe_unused]] bool isReload)
@@ -209,16 +208,6 @@ ConfigMgr* ConfigMgr::instance()
     return &instance;
 }
 
-bool ConfigMgr::Reload()
-{
-    if (!LoadAppConfigs(true))
-    {
-        return false;
-    }
-
-    return LoadModulesConfigs(true, false);
-}
-
 template<class T>
 T ConfigMgr::GetValueDefault(std::string const& name, T const& def, bool showLogs /*= true*/) const
 {
@@ -227,7 +216,7 @@ T ConfigMgr::GetValueDefault(std::string const& name, T const& def, bool showLog
     {
         if (showLogs)
         {
-            LOG_ERROR("> Config: Missing property {} in all config files, at least the .dist file must contain: \"{} = {}\"",
+            LOG_ERROR("config", "> Config: Missing property {} in all config files, at least the .dist file must contain: \"{} = {}\"",
                 name, name, Warhead::ToString(def));
         }
 
@@ -239,7 +228,7 @@ T ConfigMgr::GetValueDefault(std::string const& name, T const& def, bool showLog
     {
         if (showLogs)
         {
-            LOG_ERROR("> Config: Bad value defined for name '{}', going to use '{}' instead",
+            LOG_ERROR("config", "> Config: Bad value defined for name '{}', going to use '{}' instead",
                 name, Warhead::ToString(def));
         }
 
@@ -257,7 +246,7 @@ std::string ConfigMgr::GetValueDefault<std::string>(std::string const& name, std
     {
         if (showLogs)
         {
-            LOG_ERROR("> Config: Missing option {}, add \"{} = {}\"",
+            LOG_ERROR("config", "> Config: Missing option {}, add \"{} = {}\"",
                 name, name, def);
         }
 
@@ -276,14 +265,14 @@ T ConfigMgr::GetOption(std::string const& name, T const& def, bool showLogs /*= 
 template<>
 bool ConfigMgr::GetOption<bool>(std::string const& name, bool const& def, bool showLogs /*= true*/) const
 {
-    std::string val = GetValueDefault(name, std::string(def ? "1" : "0"), showLogs);
+    std::string val = GetValueDefault(name, Warhead::ToString(def), showLogs);
 
     auto boolVal = Warhead::StringTo<bool>(val);
     if (!boolVal)
     {
         if (showLogs)
         {
-            LOG_ERROR("> Config: Bad value defined for name '{}', going to use '{}' instead",
+            LOG_ERROR("config", "> Config: Bad value defined for name '{}', going to use '{}' instead",
                 name, def ? "true" : "false");
         }
 
@@ -310,17 +299,6 @@ std::vector<std::string> ConfigMgr::GetKeysByString(std::string const& name)
     return keys;
 }
 
-std::string const ConfigMgr::GetFilename()
-{
-    std::lock_guard<std::mutex> lock(_configLock);
-    return _usingDistConfig ? _filename + ".dist" : _filename;
-}
-
-std::vector<std::string> const& ConfigMgr::GetArguments() const
-{
-    return _args;
-}
-
 std::string const ConfigMgr::GetConfigPath()
 {
     std::lock_guard<std::mutex> lock(_configLock);
@@ -332,110 +310,21 @@ std::string const ConfigMgr::GetConfigPath()
 #endif
 }
 
-void ConfigMgr::Configure(std::string const& initFileName, std::vector<std::string> args, std::string_view modulesConfigList /*= {}*/)
+bool ConfigMgr::LoadAppConfigs(std::string_view initFileName)
 {
-    _filename = initFileName;
-    _args = std::move(args);
+    _filename = GetConfigPath() + std::string(initFileName);
 
-    // Add modules config if exist
-    if (!modulesConfigList.empty())
-    {
-        for (auto const& itr : Warhead::Tokenize(modulesConfigList, ',', false))
-        {
-            _additonalFiles.emplace_back(itr);
-        }
-    }
-}
-
-bool ConfigMgr::LoadAppConfigs(bool isReload /*= false*/)
-{
     // #1 - Load init config file .conf.dist
-    if (!LoadInitial(_filename + ".dist", isReload))
+    if (!LoadInitial(_filename + ".dist"))
     {
+        FMT_LOG_ERROR("> Bad file path for config file '{}'", _filename);
         return false;
     }
 
     // #2 - Load .conf file
-    if (!LoadAdditionalFile(_filename, true, isReload))
+    if (!LoadAdditionalFile(_filename, true))
     {
         _usingDistConfig = true;
-    }
-
-    return true;
-}
-
-bool ConfigMgr::LoadModulesConfigs(bool isReload /*= false*/, bool isNeedPrintInfo /*= true*/)
-{
-    if (_additonalFiles.empty())
-    {
-        // Send successful load if no found files
-        return true;
-    }
-
-    if (isNeedPrintInfo)
-    {
-        LOG_INFO(" ");
-        LOG_INFO("Loading modules configuration...");
-    }
-
-    // Start loading module configs
-    std::string const& moduleConfigPath = GetConfigPath() + "modules/";
-    bool isExistDefaultConfig = true;
-    bool isExistDistConfig = true;
-
-    for (auto const& distFileName : _additonalFiles)
-    {
-        std::string defaultFileName = distFileName;
-
-        if (!defaultFileName.empty())
-        {
-            defaultFileName.erase(defaultFileName.end() - 5, defaultFileName.end());
-        }
-
-        // Load .conf.dist config
-        isExistDistConfig = LoadAdditionalFile(moduleConfigPath + distFileName, false, isReload);
-
-        if (!isReload && !isExistDistConfig)
-        {
-            LOG_ERROR("> ConfigMgr::LoadModulesConfigs: Not found original config '{}'. Stop loading", distFileName);
-            ABORT();
-        }
-
-        // Load .conf config
-        isExistDefaultConfig = LoadAdditionalFile(moduleConfigPath + defaultFileName, true, isReload);
-
-        if (isExistDefaultConfig && isExistDistConfig)
-        {
-            _moduleConfigFiles.emplace_back(defaultFileName);
-        }
-        else if (!isExistDefaultConfig && isExistDistConfig)
-        {
-            _moduleConfigFiles.emplace_back(distFileName);
-        }
-    }
-
-    if (isNeedPrintInfo)
-    {
-        if (!_moduleConfigFiles.empty())
-        {
-            // Print modules configurations
-            LOG_INFO(" ");
-            LOG_INFO("Using modules configuration:");
-
-            for (auto const& itr : _moduleConfigFiles)
-            {
-                LOG_INFO("> {}", itr);
-            }
-        }
-        else
-        {
-            LOG_INFO("> Not found modules config files");
-        }
-    }
-
-    if (isNeedPrintInfo)
-    {
-        LOG_INFO(" ");
     }
 
     return true;

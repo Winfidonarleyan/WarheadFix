@@ -160,7 +160,7 @@ void ByteBuffer::print_storage() const
 
     o << " ";
 
-    LOG_TRACE("{}", o.str());
+    LOG_TRACE("network.buffer", "{}", o.str());
 }
 
 void ByteBuffer::textlike() const
@@ -173,7 +173,7 @@ void ByteBuffer::textlike() const
 
     o << " ";
 
-    LOG_TRACE("{}", o.str());
+    LOG_TRACE("network.buffer", "{}", o.str());
 }
 
 void ByteBuffer::hexlike() const
@@ -204,5 +204,5 @@ void ByteBuffer::hexlike() const
 
     o << " ";
 
-    LOG_TRACE("{}", o.str());
+    LOG_TRACE("network.buffer", "{}", o.str());
 }

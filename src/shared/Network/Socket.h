@@ -122,7 +122,7 @@ public:
         _socket.shutdown(boost::asio::socket_base::shutdown_send, shutdownError);
 
         if (shutdownError)
-            LOG_DEBUG("Socket::CloseSocket: {} errored when shutting down socket: {} ({})", GetRemoteIpAddress().to_string(),
+            LOG_DEBUG("network", "Socket::CloseSocket: {} errored when shutting down socket: {} ({})", GetRemoteIpAddress().to_string(),
                 shutdownError.value(), shutdownError.message());
 
         OnClose();
@@ -162,7 +162,7 @@ protected:
         _socket.set_option(tcp::no_delay(enable), err);
 
         if (err)
-            LOG_DEBUG("Socket::SetNoDelay: failed to set_option(boost::asio::ip::tcp::no_delay) for {} - {} ({})",
+            LOG_DEBUG("network", "Socket::SetNoDelay: failed to set_option(boost::asio::ip::tcp::no_delay) for {} - {} ({})",
                 GetRemoteIpAddress().to_string(), err.value(), err.message());
     }
 

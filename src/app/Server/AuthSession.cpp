@@ -19,6 +19,7 @@
 #include "Timer.h"
 #include "ByteBuffer.h"
 #include "Errors.h"
+#include "StopWatch.h"
 #include <hffix.hpp>
 #include <map>
 
@@ -28,6 +29,8 @@
 
 void ReadMessage(ByteBuffer& packet)
 {
+    StopWatch sw;
+
     std::map<int, std::string> field_dictionary;
     hffix::dictionary_init_field(field_dictionary);
 
@@ -113,6 +116,8 @@ void ReadMessage(ByteBuffer& packet)
     }
     else
         ABORT("Invalid FIX message: '{}'", packet.ReadCString());
+
+    LOG_DEBUG("auth", "> Read message in {}", sw);
 }
 
 void PrepareTestMessage(ByteBuffer& packet)
@@ -188,7 +193,7 @@ void PrepareTestMessage(ByteBuffer& packet)
 void AuthSession::Start()
 {
     std::string ip_address = GetRemoteIpAddress().to_string();
-    LOG_TRACE("Accepted connection from {}:{}", GetRemoteIpAddress().to_string(), GetRemotePort());
+    LOG_TRACE("auth", "Accepted connection from {}:{}", GetRemoteIpAddress().to_string(), GetRemotePort());
 
     ByteBuffer packet;
     PrepareTestMessage(packet);
@@ -199,7 +204,7 @@ void AuthSession::Start()
 
 void AuthSession::OnClose()
 {
-    LOG_TRACE("End connection from {}:{}", GetRemoteIpAddress().to_string(), GetRemotePort());
+    LOG_TRACE("auth", "End connection from {}:{}", GetRemoteIpAddress().to_string(), GetRemotePort());
 }
 
 bool AuthSession::Update()
@@ -226,13 +231,13 @@ void AuthSession::SendPacket(ByteBuffer& packet)
 {
     if (!IsOpen())
     {
-        LOG_ERROR("> Can't send packet. Socket is close");
+        LOG_ERROR("auth", "> Can't send packet. Socket is close");
         return;
     }
 
     if (packet.empty())
     {
-        LOG_ERROR("> Can't send packet. Packet is empty");
+        LOG_ERROR("auth", "> Can't send packet. Packet is empty");
         return;
     }
 

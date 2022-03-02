@@ -61,7 +61,7 @@ public:
                 }
                 catch (boost::system::system_error const& err)
                 {
-                    LOG_INFO("Failed to initialize client's socket {}", err.what());
+                    LOG_INFO("network", "Failed to initialize client's socket {}", err.what());
                 }
             }
 
@@ -76,7 +76,7 @@ public:
         _acceptor.open(_endpoint.protocol(), errorCode);
         if (errorCode)
         {
-            LOG_INFO("Failed to open acceptor {}", errorCode.message());
+            LOG_INFO("network", "Failed to open acceptor {}", errorCode.message());
             return false;
         }
 
@@ -84,7 +84,7 @@ public:
         _acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), errorCode);
         if (errorCode)
         {
-            LOG_INFO("Failed to set reuse_address option on acceptor {}", errorCode.message());
+            LOG_INFO("network", "Failed to set reuse_address option on acceptor {}", errorCode.message());
             return false;
         }
 #endif
@@ -92,14 +92,14 @@ public:
         _acceptor.bind(_endpoint, errorCode);
         if (errorCode)
         {
-            LOG_INFO("Could not bind to {}:{} {}", _endpoint.address().to_string(), _endpoint.port(), errorCode.message());
+            LOG_INFO("network", "Could not bind to {}:{} {}", _endpoint.address().to_string(), _endpoint.port(), errorCode.message());
             return false;
         }
 
         _acceptor.listen(WARHEAD_MAX_LISTEN_CONNECTIONS, errorCode);
         if (errorCode)
         {
-            LOG_INFO("Failed to start listening on {}:{} {}", _endpoint.address().to_string(), _endpoint.port(), errorCode.message());
+            LOG_INFO("network", "Failed to start listening on {}:{} {}", _endpoint.address().to_string(), _endpoint.port(), errorCode.message());
             return false;
         }
 

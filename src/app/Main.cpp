@@ -16,22 +16,33 @@
  */
 
 #include "AuthSocketMgr.h"
-#include "Duration.h"
+#include "Config.h"
+#include "StopWatch.h"
 #include "GitRevision.h"
 #include "Log.h"
 
 int main()
 {
-    LOG_INFO("{}", GitRevision::GetFullVersion());
-    LOG_INFO("");
+    if (!sConfigMgr->LoadAppConfigs("WarheadFix.conf"))
+        return 1;
+
+    // Init logging
+    sLog->Initialize();
+
+    LOG_INFO("server", "{}", GitRevision::GetFullVersion());
+    LOG_INFO("server", "");
 
     std::shared_ptr<Warhead::Asio::IoContext> ioContext = std::make_shared<Warhead::Asio::IoContext>();
 
+    StopWatch sw;
+
     if (!sAuthSocketMgr.StartNetwork(*ioContext, "127.0.0.1", 5001))
     {
-        LOG_ERROR("server.authserver", "Failed to initialize network");
+        LOG_ERROR("server", "Failed to initialize network");
         return 1;
     }
+
+    LOG_DEBUG("server", "Start network in {}", sw);
 
     std::shared_ptr<void> sAuthSocketMgrHandle(nullptr, [](void*) { sAuthSocketMgr.StopNetwork(); });
 

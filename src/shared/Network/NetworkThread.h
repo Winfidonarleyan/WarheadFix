@@ -119,13 +119,13 @@ protected:
 
     void Run()
     {
-        LOG_DEBUG("Network Thread Starting");
+        LOG_DEBUG("network", "Network Thread Starting");
 
         _updateTimer.expires_from_now(boost::posix_time::milliseconds(1));
         _updateTimer.async_wait([this](boost::system::error_code const&) { Update(); });
         _ioContext.run();
 
-        LOG_DEBUG("Network Thread exits");
+        LOG_DEBUG("network", "Network Thread exits");
         _newSockets.clear();
         _sockets.clear();
     }

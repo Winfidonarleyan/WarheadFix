@@ -31,36 +31,23 @@ class WH_COMMON_API ConfigMgr
     ~ConfigMgr() = default;
 
 public:
-    bool LoadAppConfigs(bool isReload = false);
-    bool LoadModulesConfigs(bool isReload = false, bool isNeedPrintInfo = true);
-    void Configure(std::string const& initFileName, std::vector<std::string> args, std::string_view modulesConfigList = {});
+    bool LoadAppConfigs(std::string_view initFileName);
 
     static ConfigMgr* instance();
 
-    bool Reload();
-
-    std::string const GetFilename();
     std::string const GetConfigPath();
-    [[nodiscard]] std::vector<std::string> const& GetArguments() const;
+
     std::vector<std::string> GetKeysByString(std::string const& name);
 
     template<class T>
     T GetOption(std::string const& name, T const& def, bool showLogs = true) const;
 
-    bool isDryRun() { return dryRun; }
-    void setDryRun(bool mode) { dryRun = mode; }
-
 private:
-    /// Method used only for loading main configuration files (authserver.conf and worldserver.conf)
     bool LoadInitial(std::string const& file, bool isReload = false);
     bool LoadAdditionalFile(std::string file, bool isOptional = false, bool isReload = false);
 
     template<class T>
     T GetValueDefault(std::string const& name, T const& def, bool showLogs = true) const;
-
-    bool dryRun = false;
-
-    std::vector<std::string /*config variant*/> _moduleConfigFiles;
 };
 
 class WH_COMMON_API ConfigException : public std::length_error

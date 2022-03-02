@@ -49,6 +49,9 @@ macro(GenerateApp dir appName)
       FOLDER
         "app")
 
+  # Install config
+  CopyDefaultConfig(${appName})
+
   if (UNIX)
     install(TARGETS ${appName} DESTINATION bin)
   elseif (WIN32)

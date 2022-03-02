@@ -47,10 +47,11 @@ target_link_libraries(common
     warhead-core-interface
   PUBLIC
     boost
-    threads
     fmt
-    utf8cpp
-    hffix)
+    hffix
+    spdlog
+    threads
+    utf8cpp)
 
 set_target_properties(common
   PROPERTIES

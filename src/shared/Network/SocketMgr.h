@@ -46,13 +46,13 @@ public:
         }
         catch (boost::system::system_error const& err)
         {
-            LOG_ERROR("Exception caught in SocketMgr.StartNetwork ({}:{}): {}", bindIp, port, err.what());
+            LOG_ERROR("network", "Exception caught in SocketMgr.StartNetwork ({}:{}): {}", bindIp, port, err.what());
             return false;
         }
 
         if (!acceptor->Bind())
         {
-            LOG_ERROR("StartNetwork failed to bind socket acceptor");
+            LOG_ERROR("network", "StartNetwork failed to bind socket acceptor");
             delete acceptor;
             return false;
         }
@@ -106,7 +106,7 @@ public:
         }
         catch (boost::system::system_error const& err)
         {
-            LOG_WARN("Failed to retrieve client's remote address {}", err.what());
+            LOG_WARN("network", "Failed to retrieve client's remote address {}", err.what());
         }
     }
 
