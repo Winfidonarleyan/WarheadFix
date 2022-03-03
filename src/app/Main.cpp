@@ -48,5 +48,7 @@ int main()
 
     // Start the io service worker loop
     ioContext->run();
+
+    return 0;
 }
 

@@ -36,7 +36,7 @@ public:
     [[nodiscard]] char const* what() const noexcept override { return msg_.c_str(); }
 
 protected:
-    std::string & message() noexcept { return msg_; }
+    std::string& message() noexcept { return msg_; }
 
 private:
     std::string msg_;
@@ -354,14 +354,16 @@ public:
         _rpos += skip;
     }
 
-    template <typename T> T read()
+    template <typename T>
+    T read()
     {
         T r = read<T>(_rpos);
         _rpos += sizeof(T);
         return r;
     }
 
-    template <typename T> [[nodiscard]] T read(size_t pos) const
+    template <typename T>
+    [[nodiscard]] T read(size_t pos) const
     {
         if (pos + sizeof(T) > size())
         {
