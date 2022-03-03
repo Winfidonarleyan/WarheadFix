@@ -72,7 +72,7 @@
 #                       %z - ISO 8601 offset from UTC in timezone ([+/-]HH:MM)
 #                       %E - Seconds since the epoch
 #                       %% - The % sign
-#                       %+ - spdlog's default format
+#                       %+ - spdlog's default format "[%Y-%m-%d %H:%M:%S.%e] [%n] [%l] [%s:%#] %v"
 #                       %^ - start color range (can be used only once)
 #                       %$ - end color range (for example %^[+++]%$ %v) (can be used only once)
 #                       %@ - Source file and line
@@ -84,8 +84,8 @@
 #                       %i - Elapsed time in microseconds since previous message
 #                       %u - Elapsed time in nanoseconds since previous message
 #                       %O - Elapsed time in seconds since previous message
-#                           Example for file "%Y-%m-%d %H:%M:%S %t"
-#                           Example for console "%H:%M:%S %t"
+#                           Example for file "[%Y-%m-%d %H:%M:%S.%e] [%l] %v"
+#                           Example for console "%^[%T] %v%$"
 #
 #                    Optional1 - Colors (is type Console)
 #                       Format: "fatal critical error warning notice info debug trace"
@@ -111,8 +111,8 @@
 #                       Example: "Auth.log"
 #
 #                     Optional2 - Rotate on open (is type File)
-#                       true: The log file is rotated when the is opened.
-#                       false: Log messages will be appended to an existing log file, if it exists. This is the default.
+#                       1: The log file is rotated when the is opened.
+#                       0: Log messages will be appended to an existing log file, if it exists. This is the default.
 #
 #                     Optional3 - Max files size (is type File) in Megabytes
 #                       Example: "10"
@@ -121,8 +121,8 @@
 #                       Example: "5"
 #
 
-Sink.Console = 0,0,"%^%T %v%$","green lightMagenta cyan brown red lightRed"
-Sink.Auth = 1,0,"%Y-%m-%d %T.%e %v","Auth.log",0,10,5
+Sink.Console = 0,0,"%^[%T] %v%$","green lightMagenta cyan brown red lightRed"
+Sink.Auth = 1,0,"[%Y-%m-%d %H:%M:%S.%e] [%l] %v","Auth.log",1,10,5
 
 #
 #  Logger config values: Given a logger "name"

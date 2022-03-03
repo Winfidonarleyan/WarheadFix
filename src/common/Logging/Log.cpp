@@ -19,11 +19,9 @@
 #include "Config.h"
 #include "StringConvert.h"
 #include "Tokenize.h"
-#include <unordered_map>
-
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/sinks/rotating_file_sink.h"
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 
 namespace
 {
@@ -39,7 +37,7 @@ namespace
     std::shared_ptr<spdlog::logger> GetLoggerByType(std::string_view type)
     {
         if (auto logger = spdlog::get(std::string(type)))
-            return std::move(logger);
+            return logger;
 
         if (type == LOGGER_ROOT)
             return nullptr;
@@ -158,8 +156,6 @@ bool Log::ShouldLog(std::string_view type, LogLevel level) const
     if (!logger)
         return false;
 
-    //return logger->should_log(spdlog::level::level_enum(level));
-
     LogLevel logLevel = LogLevel(logger->level());
     return logLevel != LogLevel::Disabled && logLevel <= level;
 }
@@ -224,6 +220,7 @@ void Log::CreateLoggerFromConfig(std::string const& configLoggerName)
         auto logger = std::make_shared<spdlog::logger>(loggerName);
         logger->set_level(static_cast<spdlog::level::level_enum>(level));
         logger->sinks().swap(sinkList);
+        logger->flush_on(spdlog::level::level_enum(LogLevel::Error));
         spdlog::register_logger(logger);
     }
     catch (const std::exception& e)
@@ -334,6 +331,7 @@ void Log::CreateSinksFromConfig(std::string const& loggerSinkName)
             // Configuration file channel
             auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(m_logsDir + std::string(fileName), *maxFilesSize * 1048576, *maxFiles, *rotateOnOpen);
             fileSink->set_level(spdlog::level::level_enum(level));
+            fileSink->set_pattern(std::string(pattern));
 
             AddSink(sinkName, fileSink);
         }
@@ -352,7 +350,7 @@ void Log::Write(std::string_view filter, LogLevel const level, const char* file,
     if (!logger)
         return;
 
-    logger->log(spdlog::source_loc{ __FILE__, __LINE__, SPDLOG_FUNCTION }, spdlog::level::level_enum(level), message);
+    logger->log(spdlog::source_loc{ file, line, function }, spdlog::level::level_enum(level), message);
 }
 
 void Log::AddSink(std::string const& sinkName, std::shared_ptr<spdlog::sinks::sink> sink)
