@@ -33,7 +33,7 @@ FixMessage* FixMessage::instance()
     return &instance;
 }
 
-void FixMessage::ReadMessage(ByteBuffer& packet)
+bool FixMessage::IsReadLogonMessage(ByteBuffer& packet)
 {
     StopWatch sw;
 
@@ -45,85 +45,112 @@ void FixMessage::ReadMessage(ByteBuffer& packet)
 
     hffix::message_reader reader(message, length);
 
-    if (reader.is_valid())
+    if (!reader.is_valid())
     {
-        // Here is a complete message. Read fields out of the reader.
-        try
+        LOG_ERROR("fix.message", "Invalid FIX message: '{}'", packet.ReadCString());
+        return false;
+    }
+
+    try
+    {
+        if (reader.message_type()->value() != "A")
         {
-            if (reader.message_type()->value() == "A")
-            {
-                std::cout << "Logon message\n";
-
-                hffix::message_reader::const_iterator i = reader.begin();
-
-                if (reader.find_with_hint(hffix::tag::SenderCompID, i))
-                    std::cout
-                    << "SenderCompID = "
-                    << i++->value() << '\n';
-
-                if (reader.find_with_hint(hffix::tag::MsgSeqNum, i))
-                    std::cout
-                    << "MsgSeqNum    = "
-                    << i++->value().as_int<int>() << '\n';
-
-                if (reader.find_with_hint(hffix::tag::SendingTime, i))
-                {
-                    std::chrono::time_point<std::chrono::system_clock, Milliseconds> now;
-                    std::string timeStr = "<error>";
-
-                    if (i++->value().as_timestamp(now))
-                    {
-                        timeStr = Warhead::Time::TimeToHumanReadable(std::chrono::duration_cast<Seconds>(now.time_since_epoch()));
-                    }
-
-                    std::cout
-                        << "SendingTime  = "
-                        << timeStr << '\n';
-                }
-
-                std::cout
-                    << "The next field is "
-                    << hffix::field_name(i->tag(), field_dictionary)
-                    << " = " << i->value() << '\n';
-
-                std::cout << '\n';
-            }
-            else if (reader.message_type()->value() == "D")
-            {
-                std::cout << "New Order Single message\n";
-
-                hffix::message_reader::const_iterator i = reader.begin();
-
-                if (reader.find_with_hint(hffix::tag::Side, i))
-                    std::cout <<
-                    (i++->value().as_char() == '1' ? "Buy " : "Sell ");
-
-                if (reader.find_with_hint(hffix::tag::Symbol, i))
-                    std::cout << i++->value() << " ";
-
-                if (reader.find_with_hint(hffix::tag::OrderQty, i))
-                    std::cout << i++->value().as_int<int>();
-
-                if (reader.find_with_hint(hffix::tag::Price, i)) {
-                    int mantissa, exponent;
-                    i->value().as_decimal(mantissa, exponent);
-                    std::cout << " @ $" << mantissa << "E" << exponent;
-                    ++i;
-                }
-
-                std::cout << "\n\n";
-            }
-
+            LOG_ERROR("fix.message", "> Message is not logon type. Message type '{}'", reader.message_type()->value().as_string());
+            return false;
         }
-        catch (std::exception const& ex)
+
+        LOG_INFO("fix.message", "Logon message");
+
+        hffix::message_reader::const_iterator i = reader.begin();
+
+        if (reader.find_with_hint(hffix::tag::SenderCompID, i))
+            LOG_INFO("fix.message", "SenderCompID = {}", i++->value().as_string());
+
+        if (reader.find_with_hint(hffix::tag::BeginString, i))
+            LOG_INFO("fix.message", "BeginString = {}", i++->value().as_string());
+
+        if (reader.find_with_hint(hffix::tag::MsgSeqNum, i))
+            LOG_INFO("fix.message", "MsgSeqNum = {}", i++->value().as_int<int>());
+
+        if (reader.find_with_hint(hffix::tag::SendingTime, i))
         {
-            LOG_ERROR("> {}: Error reading fields: '{}'", __FUNCTION__, ex.what());
+            std::chrono::time_point<std::chrono::system_clock, Milliseconds> now;
+            std::string timeStr = "<error>";
+
+            if (i++->value().as_timestamp(now))
+            {
+                timeStr = Warhead::Time::TimeToHumanReadable(std::chrono::duration_cast<Seconds>(now.time_since_epoch()));
+            }
+
+            LOG_INFO("fix.message", "SendingTime = {}", timeStr);
         }
     }
-    else
-        ABORT("Invalid FIX message: '{}'", packet.ReadCString());
+    catch (std::exception const& ex)
+    {
+        LOG_ERROR("fix.message", "> {}: Error reading fields: '{}'", __FUNCTION__, ex.what());
+        return false;
+    }
 
-    LOG_DEBUG("auth", "> Read message in {}", sw);
+    LOG_DEBUG("fix.message", "> Read message in {}", sw);
+    LOG_INFO("fix.message", "");
+    return true;
+}
+
+bool FixMessage::IsReadNewOrderSingleMessage(ByteBuffer& packet)
+{
+    StopWatch sw;
+
+    std::map<int, std::string> field_dictionary;
+    hffix::dictionary_init_field(field_dictionary);
+
+    const char* message = (const char*)packet.contents();
+    size_t length = packet.size();
+
+    hffix::message_reader reader(message, length);
+
+    if (!reader.is_valid())
+    {
+        LOG_ERROR("fix.message", "Invalid FIX message: '{}'", packet.ReadCString());
+        return false;
+    }
+
+    try
+    {
+        if (reader.message_type()->value() != "D")
+        {
+            LOG_ERROR("fix.message", "> Message is not New Order Single type. Message type '{}'", reader.message_type()->value().as_string());
+            return false;
+        }
+
+        LOG_INFO("fix.message", "New Order Single message");
+
+        hffix::message_reader::const_iterator i = reader.begin();
+
+        if (reader.find_with_hint(hffix::tag::Side, i))
+            LOG_INFO("fix.message", "SenderCompID = {}", i++->value().as_char() == '1' ? "Buy" : "Sell");
+
+        if (reader.find_with_hint(hffix::tag::Symbol, i))
+            LOG_INFO("fix.message", "{}", i++->value().as_string());
+
+        if (reader.find_with_hint(hffix::tag::OrderQty, i))
+            LOG_INFO("fix.message", "{}", i++->value().as_int<int>());
+
+        if (reader.find_with_hint(hffix::tag::Price, i))
+        {
+            int mantissa, exponent;
+            i->value().as_decimal(mantissa, exponent);
+            LOG_INFO("fix.message", "@ ${} E{}", mantissa, exponent);
+        }
+    }
+    catch (std::exception const& ex)
+    {
+        LOG_ERROR("fix.message", "> {}: Error reading fields: '{}'", __FUNCTION__, ex.what());
+        return false;
+    }
+
+    LOG_DEBUG("fix.message", "> Read message in {}", sw);
+    LOG_INFO("fix.message", "");
+    return true;
 }
 
 void FixMessage::PrepareTestMessage(ByteBuffer& packet)
@@ -133,7 +160,7 @@ void FixMessage::PrepareTestMessage(ByteBuffer& packet)
 
     int seq_send(1); // Sending sequence number.
 
-    char buffer[1 << 13];
+    char buffer[1 << 12];
 
     std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
 
@@ -193,5 +220,32 @@ void FixMessage::PrepareTestMessage(ByteBuffer& packet)
 
     //Now the New Order message is in the buffer after the Logon message.
 
+    packet.resize(1 << 12);
     packet << buffer;
+}
+
+bool FixMessage::IsValidCommand(ByteBuffer& packet, std::string_view command)
+{
+    const char* message = (const char*)packet.contents();
+    size_t length = packet.size();
+
+    hffix::message_reader reader(message, length);
+
+    if (reader.is_valid() && std::string(command) == reader.message_type()->value())
+        return true;
+
+    return false;
+}
+
+std::string FixMessage::GetCommand(ByteBuffer& packet)
+{
+    const char* message = (const char*)packet.contents();
+    size_t length = packet.size();
+
+    hffix::message_reader reader(message, length);
+
+    if (reader.is_valid())
+        return reader.message_type()->value().as_string();
+
+    return "";
 }

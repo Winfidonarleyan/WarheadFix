@@ -23,14 +23,29 @@
 #include "StopWatch.h"
 #include <map>
 
+constexpr auto FIX_PROTOCOL_SUPPORT = "FIX.5.0";
+
+struct AuthHandler
+{
+    AuthStatus status;
+    bool (AuthSession::* handler)();
+};
+
+std::unordered_map<std::string, AuthHandler> AuthSession::InitHandlers()
+{
+    std::unordered_map<std::string, AuthHandler> handlers;
+
+    handlers["A"] = { AuthStatus::NotAuthed,    &AuthSession::HandleLogonMessage };
+    handlers["D"] = { AuthStatus::Authed,       &AuthSession::HandleNewOrderSingleMessage };
+
+    return handlers;
+}
+
+std::unordered_map<std::string, AuthHandler> const Handlers = AuthSession::InitHandlers();
+
 void AuthSession::Start()
 {
     LOG_TRACE("auth", "Accepted connection from {}:{}", GetRemoteIpAddress().to_string(), GetRemotePort());
-
-    ByteBuffer packet;
-    sFixMessage->PrepareTestMessage(packet);
-    SendPacket(packet);
-
     AsyncRead();
 }
 
@@ -50,9 +65,55 @@ bool AuthSession::Update()
 void AuthSession::ReadHandler()
 {
     MessageBuffer& packet = GetReadBuffer();
+
+    // Check protocol
+    {
+        MessageBuffer header;
+        header.Resize(7);
+        header.Write(packet.GetReadPointer() + 2, 7);
+
+        ByteBuffer buffer(std::move(header));
+
+        std::string fixProtocol;
+        buffer >> fixProtocol;
+
+        if (fixProtocol != FIX_PROTOCOL_SUPPORT)
+        {
+            LOG_ERROR("auth", "> Client {}:{} using unsupport protocol {}", GetRemoteIpAddress().to_string(), GetRemotePort(), fixProtocol);
+            CloseSocket();
+            return;
+        }
+    }
+
     ByteBuffer buffer(std::move(MessageBuffer(packet)));
 
-    sFixMessage->ReadMessage(buffer);
+    std::string cmd = sFixMessage->GetCommand(buffer);
+    auto const& itr = Handlers.find(cmd);
+    if (itr == Handlers.end())
+    {
+        LOG_ERROR("auth", "> Client {}:{} using unknown command '{}'", GetRemoteIpAddress().to_string(), GetRemotePort(), cmd);
+        //CloseSocket();
+        return;
+    }
+
+    if (_status != itr->second.status)
+    {
+        CloseSocket();
+        return;
+    }
+
+    if (!sFixMessage->IsValidCommand(buffer, cmd))
+    {
+        LOG_ERROR("auth", "> Client {}:{} using invalid command '{}'", GetRemoteIpAddress().to_string(), GetRemotePort(), cmd);
+        //CloseSocket();
+        return;
+    }
+
+    if (!(*this.*itr->second.handler)())
+    {
+        CloseSocket();
+        return;
+    }
 
     packet.Reset();
 
@@ -76,4 +137,27 @@ void AuthSession::SendPacket(ByteBuffer& packet)
     MessageBuffer buffer(packet.size());
     buffer.Write(packet.contents(), packet.size());
     QueuePacket(std::move(buffer));
+}
+
+bool AuthSession::HandleLogonMessage()
+{
+    ByteBuffer buffer(std::move(MessageBuffer(GetReadBuffer())));
+
+    if (sFixMessage->IsReadLogonMessage(buffer))
+    {
+        _status = AuthStatus::Authed;
+
+        sFixMessage->PrepareTestMessage(buffer);
+        SendPacket(buffer);
+
+        return true;
+    }
+
+    return false;
+}
+
+bool AuthSession::HandleNewOrderSingleMessage()
+{
+    ByteBuffer buffer(std::move(MessageBuffer(GetReadBuffer())));
+    return sFixMessage->IsReadNewOrderSingleMessage(buffer);
 }

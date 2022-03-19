@@ -23,6 +23,14 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <memory>
 
+enum class AuthStatus
+{
+    NotAuthed,
+    Authed
+};
+
+struct AuthHandler;
+
 class AuthSession : public Socket<AuthSession>
 {
     using AuthSocket = Socket<AuthSession>;
@@ -30,6 +38,8 @@ class AuthSession : public Socket<AuthSession>
 public:
     AuthSession(boost::asio::ip::tcp::socket&& socket) :
         Socket(std::move(socket)) { }
+
+    static std::unordered_map<std::string, AuthHandler> InitHandlers();
 
     void Start() override;    
     bool Update() override;
@@ -39,6 +49,12 @@ public:
 protected:
     void ReadHandler() override;
     void OnClose() override;
+
+private:
+    bool HandleLogonMessage();
+    bool HandleNewOrderSingleMessage();
+
+    AuthStatus _status{ AuthStatus::NotAuthed };
 };
 
 #endif

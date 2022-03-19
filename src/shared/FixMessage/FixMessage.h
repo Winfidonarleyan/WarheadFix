@@ -20,6 +20,7 @@
 
 #include "ByteBuffer.h"
 #include <memory>
+#include <string_view>
 
 class WH_SHARED_API FixMessage
 {
@@ -33,8 +34,12 @@ class WH_SHARED_API FixMessage
 public:
     static FixMessage* instance();
 
-    void ReadMessage(ByteBuffer& packet);
     void PrepareTestMessage(ByteBuffer& packet);
+    bool IsValidCommand(ByteBuffer& packet, std::string_view command);
+    std::string GetCommand(ByteBuffer& packet);
+
+    bool IsReadLogonMessage(ByteBuffer& packet);
+    bool IsReadNewOrderSingleMessage(ByteBuffer& packet);
 };
 
 #define sFixMessage FixMessage::instance()
