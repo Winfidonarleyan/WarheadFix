@@ -24,6 +24,7 @@
 #include <fstream>
 #include <mutex>
 #include <unordered_map>
+#include <algorithm>
 
 namespace
 {
@@ -32,6 +33,15 @@ namespace
     std::unordered_map<std::string /*name*/, std::string /*value*/> _configOptions;
     std::mutex _configLock;
     bool _usingDistConfig = false;
+
+    // Check logging system configs like LogChannel.* and Logger.*
+    bool IsLoggingSystemOptions(std::string_view optionName)
+    {
+        size_t foundSink = optionName.find("Sink.");
+        size_t foundLogger = optionName.find("Logger.");
+
+        return foundSink != std::string_view::npos || foundLogger != std::string_view::npos;
+    }
 
     template<typename... Args>
     inline void PrintError(std::string_view fmt, Args&& ... args)
@@ -46,7 +56,7 @@ namespace
         // Check old option
         if (isOptional && itr == _configOptions.end())
         {
-            if (!isReload)
+            if (!IsLoggingSystemOptions(optionName) && !isReload)
             {
                 PrintError("> Config::LoadFile: Found incorrect option '{}' in config file '{}'. Skip", optionName, fileName);
 
