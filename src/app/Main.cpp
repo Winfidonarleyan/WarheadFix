@@ -71,7 +71,7 @@ int main(int argc, char** argv)
 
     std::string bindIp = sConfigMgr->GetOption<std::string>("BindIP", "0.0.0.0");
 
-    if (!sAuthSocketMgr.StartNetwork(*ioContext, "127.0.0.1", 5001))
+    if (!sAuthSocketMgr.StartNetwork(*ioContext, bindIp, port))
     {
         LOG_ERROR("server", "Failed to initialize network");
         return 1;
