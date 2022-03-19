@@ -13,11 +13,34 @@
 # This is done EACH compile so they can be alerted about the consequences.
 #
 
-##############################################
+###################################################################################################
 #
 #   WARHEAD FIX CONFIG
 #
+#    LogsDir
+#        Description: Logs directory setting.
+#        Important:   LogsDir needs to be quoted, as the string might contain space characters.
+#                     Logs directory must exists, or log file creation will be disabled.
+#        Example:     "/.../logs"
+#        Default:     "" - (Log files will be stored in the current path)
 
+LogsDir = ""
+
+#
+#    ServerPort
+#        Description: TCP port to reach the server.
+#        Default:     3724
+
+ServerPort = 5001
+
+#
+#
+#    BindIP
+#        Description: Bind server to IP/hostname
+#        Default:     "0.0.0.0" - (Bind to all IPs on the system)
+
+BindIP = "0.0.0.0"
+###################################################################################################
 
 ###################################################################################################
 #

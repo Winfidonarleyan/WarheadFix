@@ -20,10 +20,35 @@
 #include "StopWatch.h"
 #include "GitRevision.h"
 #include "Log.h"
+#include "Util.h"
 
-int main()
+#ifndef _WARHEAD_FIX_CONFIG
+#define _WARHEAD_FIX_CONFIG "WarheadFix.conf"
+#endif
+
+int main(int argc, char** argv)
 {
-    if (!sConfigMgr->LoadAppConfigs("WarheadFix.conf"))
+    // Command line parsing to get the configuration file name
+    std::string configFile = sConfigMgr->GetConfigPath() + std::string(_WARHEAD_FIX_CONFIG);
+    int count = 1;
+
+    while (count < argc)
+    {
+        if (strcmp(argv[count], "-c") == 0)
+        {
+            if (++count >= argc)
+            {
+                fmt::print("Runtime-Error: -c option requires an input argument\n");
+                return 1;
+            }
+            else
+                configFile = argv[count];
+        }
+
+        ++count;
+    }
+
+    if (!sConfigMgr->LoadAppConfigs(configFile))
         return 1;
 
     // Init logging
@@ -35,6 +60,16 @@ int main()
     std::shared_ptr<Warhead::Asio::IoContext> ioContext = std::make_shared<Warhead::Asio::IoContext>();
 
     StopWatch sw;
+
+    // Start the listening port (acceptor) for auth connections
+    int32 port = sConfigMgr->GetOption<int32>("ServerPort", 5001);
+    if (port < 0 || port > 0xFFFF)
+    {
+        LOG_ERROR("server", "Specified port out of allowed range (1-65535)");
+        return 1;
+    }
+
+    std::string bindIp = sConfigMgr->GetOption<std::string>("BindIP", "0.0.0.0");
 
     if (!sAuthSocketMgr.StartNetwork(*ioContext, "127.0.0.1", 5001))
     {

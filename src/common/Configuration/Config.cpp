@@ -312,7 +312,7 @@ std::string const ConfigMgr::GetConfigPath()
 
 bool ConfigMgr::LoadAppConfigs(std::string_view initFileName)
 {
-    _filename = GetConfigPath() + std::string(initFileName);
+    _filename = std::string(initFileName);
 
     // #1 - Load init config file .conf.dist
     if (!LoadInitial(_filename + ".dist"))
