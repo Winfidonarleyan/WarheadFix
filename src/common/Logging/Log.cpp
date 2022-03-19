@@ -280,6 +280,7 @@ void Log::CreateSinksFromConfig(std::string const& loggerSinkName)
             consoleSink->set_level(spdlog::level::level_enum(level));
             consoleSink->set_pattern(std::string(pattern));
 
+#if WARHEAD_PLATFORM == WARHEAD_PLATFORM_WINDOWS
             // Init Colors
             auto colorOptions = GetPositionOptions(options, SinkOptions::Option1);
 
@@ -296,7 +297,7 @@ void Log::CreateSinksFromConfig(std::string const& loggerSinkName)
                     consoleSink->set_color(spdlog::level::level_enum::critical, GetColorCode(tokensColor[5]));
                 }
             }
-
+#endif
             AddSink(sinkName, consoleSink);
         }
         catch (const spdlog::spdlog_ex& ex)
